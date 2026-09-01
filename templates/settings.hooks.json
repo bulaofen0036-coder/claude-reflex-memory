@@ -1,0 +1,45 @@
+{
+  "//": "Merge this into ~/.claude/settings.json. Replace <REFLEX> with your deploy dir, e.g. C:/Users/you/.claude/reflex or /home/you/.claude/reflex. On Windows, use a full python.exe path if python is not on PATH.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PYTHONIOENCODING=utf-8 python \"<REFLEX>/reflex_guard.py\" || cat \"<REFLEX>/LESSONS.md\"",
+            "shell": "bash",
+            "timeout": 15,
+            "statusMessage": "reflex: inject LESSONS + self-check..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PYTHONIOENCODING=utf-8 python \"<REFLEX>/reflex_domain.py\"",
+            "shell": "bash",
+            "timeout": 10,
+            "statusMessage": "reflex: domain layer..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PYTHONIOENCODING=utf-8 python \"<REFLEX>/reflex_action.py\"",
+            "shell": "bash",
+            "timeout": 10,
+            "statusMessage": "reflex: action red lines..."
+          }
+        ]
+      }
+    ]
+  }
+}
