@@ -37,7 +37,8 @@ def load_meta(path):
     """Read trigger keywords from the file header. Unreadable/absent header
     means the file can never fire — the guard reports that as an error
     (silent loss is the one new failure mode of this design)."""
-    head = io.open(path, encoding="utf-8").read(1200)
+    # utf-8-sig: files saved by Notepad / PowerShell carry a BOM
+    head = io.open(path, encoding="utf-8-sig").read(1200)
     kws, cwds = [], []
     m = re.search(r"<!--\s*triggers:\s*(.*?)-->", head, re.S)
     if m:
@@ -50,8 +51,22 @@ def load_meta(path):
 
 def body_of(path):
     """Strip header comments; inject the body only."""
-    txt = io.open(path, encoding="utf-8").read()
+    # utf-8-sig, not utf-8: with a BOM in front, the ^\s* anchor below never matches,
+    # so the header comment (the whole trigger list) leaks into the injected body.
+    txt = io.open(path, encoding="utf-8-sig").read()
     return re.sub(r"^\s*(<!--.*?-->\s*)+", "", txt, flags=re.S).strip()
+
+
+def kw_hit(kw, text):
+    """Pure-ASCII keywords match on word boundaries; anything else (CJK etc.) is a
+    substring match, because those scripts have no word separators.
+
+    A bare `kw in prompt` makes short ASCII keywords fire on unrelated text:
+    "to" hits "photo", "ns" hits "instructions", "gh" hits "high". Replaying a month
+    of real prompts showed half of all sessions loading a 58 KB domain file that way."""
+    if re.match(r"^[\x20-\x7e]+$", kw):
+        return re.search(r"(?<![a-z0-9])" + re.escape(kw) + r"(?![a-z0-9])", text) is not None
+    return kw in text
 
 
 def sweep_state():
@@ -88,7 +103,7 @@ def main():
         if key in done:
             continue
         kws, cwds = load_meta(path)
-        hit = any(k in prompt for k in kws) or any(c in cwd for c in cwds)
+        hit = any(kw_hit(k, prompt) for k in kws) or any(c in cwd for c in cwds)
         if not hit:
             continue
         chunks.append(body_of(path))
